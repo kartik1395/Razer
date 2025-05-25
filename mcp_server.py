@@ -14,6 +14,7 @@ MAX_TOKENS = 4000
 SUMMARY_THRESHOLD = 3000
 SERP_API_KEY = os.getenv("GOOGLE_SERP_KEY")
 
+client = openai.OpenAI(api_key=os.getenv("OPEN_AI_KEY"))
 
 app = FastAPI()
 
@@ -34,22 +35,27 @@ def reset_history():
     summaries.clear()
 
 def count_tokens( messages: List[Dict[str, str]]):
+    print(messages)
     num_tokens = 0
     for msg in messages: 
         num_tokens += len(tokenizer.encode(msg['content']))
 
     return num_tokens
 
-def enforce_token_limit():
-    all_tokens = count_tokens(history) + len(tokenizer.encode('\n'.join(summaries)))
+async def enforce_token_limit():
+    history_tokens = count_tokens(history)
+    summary_tokens = len(tokenizer.encode('\n'.join(summaries)))
+    all_tokens = history_tokens + summary_tokens
+    print(f"Tokens used: {history_tokens} tokens from history, {summary_tokens} tokens from summaries, total {all_tokens} tokens")
     if all_tokens > SUMMARY_THRESHOLD:
-        summarise()
+        print(f"Token limit exceeded: {all_tokens} tokens, summarizing history")
+        await summarise()
 
 @app.get("/summarize_history")
 async def summarise():
     if len(history) == 0:
         return "No conversation yet, nothing to summarise"
-    response = openai.chat.completions.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=
             [{"role": "system", "content": "Summarize this conversation"}] + history
@@ -59,10 +65,13 @@ async def summarise():
     summary = response.choices[0].message.content
     summaries.append(summary)
     history.clear()
+    print(f"Summary added: {summary}")
+    print(f"History cleared, {history}")
     return summary
 
 @app.post("/get_context")
-def get_context( max_tokens: int = MAX_TOKENS):
+async def get_context( max_tokens: int = MAX_TOKENS):
+    await enforce_token_limit()
     context = "\n".join(summaries) + '\n'
     context_tokens = len(tokenizer.encode(context))
 
@@ -100,9 +109,6 @@ async def GoogleSearchTool(query: Dict) -> str:
         print(overview)
         answer = overview['text_blocks'][0]['snippet']
         print(answer)
-        # response = requests.get(
-        #     f"https://en.wikipedia.org/api/rest_v1/page/summary/{search_term.replace(' ', '_')}"
-        # )
         if response.status_code == 200:
             return answer
         else:

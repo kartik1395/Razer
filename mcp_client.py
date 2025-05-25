@@ -12,9 +12,7 @@ MCP_SERVER_URL = "http://localhost:8000"
 key = os.getenv("OPEN_AI_KEY")
 client = OpenAI(api_key=key) #Use your open ai key, I have not passed the .env file in the repo
 
-FACTUAL_KEYWORDS = ["what is", "what are", "how many", "when did", "where is", "who is",
-            "define", "explain", "tell me about", "information about", "facts about",
-            "history of", "genres", "types of", "examples of", "list of"]
+FACTUAL_KEYWORDS = ["what is", "what are", "how many", "when did", "where is", "who is"]
 
 state = {
     "user_input": "",
@@ -34,7 +32,9 @@ class GraphState(TypedDict, total=False):
 
 #InputNode
 def input_node(state):
+    user_msg = {"role": "user", "content": state["user_input"]}
     user_input = state["user_input"]
+    requests.post("http://localhost:8000/add_message", json=user_msg)
     return {"user_input": user_input}
 
 #CheckContextNode
@@ -87,13 +87,12 @@ def llm_node(state):
 
 #OutputNode
 def output_node(state):
-    user_msg = {"role": "user", "content": state["user_input"]}
+    
     assistant_msg = {"role": "assistant", "content": state["response"]}
 
-    requests.post("http://localhost:8000/add_message", json=user_msg)
     requests.post("http://localhost:8000/add_message", json=assistant_msg)
 
-    print(f"Adam: {state['response']}")
+    print(f"{state['response']}")
     return state
 
 def tool_router(state):
@@ -131,5 +130,5 @@ if __name__ == "__main__":
     graph = build_langgraph()
     while True:
         user_input = input("You: ")
-        print("-" * 100)
         graph.invoke({"user_input": user_input})
+        print("-" * 100)
