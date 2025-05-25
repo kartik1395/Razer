@@ -32,6 +32,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 ---
 ### Install Dependencies
+Please ensure that you create a `.env` file with your Open AI API Key and SERP API Key.
 ```bash
 pip install -r requirements.txt
 ```
